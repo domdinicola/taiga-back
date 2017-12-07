@@ -18,14 +18,13 @@
 
 from importlib import import_module
 
-import random
 import uuid
 import re
 
 from django.apps import apps
 from django.apps.config import MODELS_MODULE_NAME
 from django.conf import settings
-from django.contrib.auth.models import UserManager, AbstractBaseUser
+from django.contrib.auth.models import AbstractBaseUser, UserManager as DjangoUserManager
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.core import validators
@@ -130,6 +129,19 @@ def get_default_uuid():
     return uuid.uuid4().hex
 
 
+class UserManager(DjangoUserManager):
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_superuser', False)
+        return self._create_user(username, email, password, **extra_fields)
+
+    def create_superuser(self, username, email, password, **extra_fields):
+        extra_fields.setdefault('is_superuser', True)
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self._create_user(username, email, password, **extra_fields)
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     uuid = models.CharField(max_length=32, editable=False, null=False,
                             blank=False, unique=True, default=get_default_uuid)
@@ -169,7 +181,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     new_email = models.EmailField(_("new email address"), null=True, blank=True)
 
     is_system = models.BooleanField(null=False, blank=False, default=False)
-
 
     max_private_projects = models.IntegerField(null=True, blank=True,
                                                default=settings.MAX_PRIVATE_PROJECTS_PER_USER,
